@@ -1,0 +1,11 @@
+[package]
+name = "adventofcode2019"
+version = "1.0.0"
+authors = ["Remi Rampin <r@remirampin.com>"]
+edition = "2018"
+
+[dependencies]
+
+[[bin]]
+name = "day01"
+path = "src/day01.rs"
