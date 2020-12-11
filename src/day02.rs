@@ -1,28 +1,28 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use adventofcode2019::{Res, read_program, run_program};
+use adventofcode2019::{Res, read_program, run_program, no_input, no_output};
 
 #[test]
 fn test_exec() {
     let mut program = vec![1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50];
-    assert!(run_program(&mut program).is_ok());
+    run_program(&mut program, no_input, no_output).unwrap();
     assert_eq!(&program, &[3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]);
 
     let mut program = vec![1, 0, 0, 0, 99];
-    assert!(run_program(&mut program).is_ok());
+    run_program(&mut program, no_input, no_output).unwrap();
     assert_eq!(&program, &[2, 0, 0, 0, 99]);
 
     let mut program = vec![2, 3, 0, 3, 99];
-    assert!(run_program(&mut program).is_ok());
+    run_program(&mut program, no_input, no_output).unwrap();
     assert_eq!(&program, &[2, 3, 0, 6, 99]);
 
     let mut program = vec![2, 4, 4, 5, 99, 0];
-    assert!(run_program(&mut program).is_ok());
+    run_program(&mut program, no_input, no_output).unwrap();
     assert_eq!(&program, &[2, 4, 4, 5, 99, 9801]);
 
     let mut program = vec![1, 1, 1, 4, 99, 5, 6, 0, 99];
-    assert!(run_program(&mut program).is_ok());
+    run_program(&mut program, no_input, no_output).unwrap();
     assert_eq!(&program, &[30, 1, 1, 4, 2, 5, 6, 0, 99]);
 }
 
@@ -42,7 +42,7 @@ fn main() -> Res<()> {
         program[2] = 2;
 
         // Run it
-        run_program(&mut program)?;
+        run_program(&mut program, no_input, no_output)?;
 
         // Print output
         println!("Output: {}", program[0]);
@@ -56,7 +56,7 @@ fn main() -> Res<()> {
                 let mut program = program.clone();
                 program[1] = noun;
                 program[2] = verb;
-                match run_program(&mut program) {
+                match run_program(&mut program, no_input, no_output) {
                     Err(_) => {} // Not good
                     Ok(()) => {
                         if program[0] == 19690720 {

@@ -54,7 +54,16 @@ fn write(program: &mut Vec<i32>, pos: i32, value: i32) -> Res<()> {
     }
 }
 
-pub fn step_program(program: &mut Vec<i32>, counter: &mut usize) -> Res<bool> {
+pub fn step_program<I, O>(
+    program: &mut Vec<i32>,
+    counter: &mut usize,
+    mut input: I,
+    mut output: O,
+) -> Res<bool>
+where
+    I: FnMut() -> Res<i32>,
+    O: FnMut(i32) -> Res<()>,
+{
     if *counter >= program.len() {
         Ok(false)
     } else {
@@ -74,6 +83,12 @@ pub fn step_program(program: &mut Vec<i32>, counter: &mut usize) -> Res<bool> {
             let target = read(program, *counter as i32 + 3)?;
             write(program, target, op1 * op2)?;
             *counter += 4;
+        } else if instr == 3 {
+            let op = read(program, *counter as i32 + 1)?;
+            write(program, op, input()?)?;
+        } else if instr == 4 {
+            let op = read(program, *counter as i32 + 1)?;
+            output(op)?;
         } else {
             return Err(format!("Unknown instruction {} at position {}", instr, counter).into());
         }
@@ -81,11 +96,27 @@ pub fn step_program(program: &mut Vec<i32>, counter: &mut usize) -> Res<bool> {
     }
 }
 
-pub fn run_program(program: &mut Vec<i32>) -> Res<()> {
+pub fn run_program<I, O>(
+    program: &mut Vec<i32>,
+    mut input: I,
+    mut output: O,
+) -> Res<()>
+where
+    I: FnMut() -> Res<i32>,
+    O: FnMut(i32) -> Res<()>,
+{
     let mut counter = 0;
     loop {
-        if !step_program(program, &mut counter)? {
+        if !step_program(program, &mut counter, &mut input, &mut output)? {
             return Ok(());
         }
     }
+}
+
+pub fn no_input() -> Res<i32> {
+    Err("No input available".into())
+}
+
+pub fn no_output(_: i32) -> Res<()> {
+    Err("No output possible".into())
 }
