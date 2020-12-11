@@ -5,6 +5,8 @@ pub type Res<O> = Result<O, Box<dyn std::error::Error>>;
 pub fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
     let mut program = Vec::new();
 
+    let mut position = 0;
+    let mut negative = false;
     let mut number: i32 = 0;
     loop {
         let byte = {
@@ -15,19 +17,26 @@ pub fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
                 _ => panic!("Invalid return from read()"),
             }
         };
-        if b'0' <= byte && byte <= b'9' {
+        if byte == b'-' {
+            if number != 0 || negative {
+                return Err(format!("Unexpected - sign at {}", position).into());
+            }
+            negative = true;
+        } else if b'0' <= byte && byte <= b'9' {
             number = number * 10 + (byte - b'0') as i32;
         } else if byte == b',' || byte == b'\n' {
-            program.push(number);
+            program.push(if negative { -number } else { number });
             number = 0;
+            negative = false;
             if byte == b'\n' {
                 break;
             }
         } else {
             return Err(
-                format!("Invalid character in input: {:?}", byte).into(),
+                format!("Invalid character at {}: 0x{:x}", position, byte).into(),
             );
         }
+        position += 1;
     }
 
     Ok(program)
