@@ -166,6 +166,34 @@ where
         } else if instr == 4 {
             let op = read_parameter(&mut decoder, &memory, counter)?;
             output(op)?;
+        } else if instr == 5 {
+            let op1 = read_parameter(&mut decoder, &memory, counter)?;
+            let op2 = read_parameter(&mut decoder, &memory, counter)?;
+            if op1 != 0 {
+                if op2 < 0 {
+                    return Err(format!("Attempt to jump to {} at position {}", op2, counter).into());
+                }
+                *counter = op2 as usize;
+            }
+        } else if instr == 6 {
+            let op1 = read_parameter(&mut decoder, &memory, counter)?;
+            let op2 = read_parameter(&mut decoder, &memory, counter)?;
+            if op1 == 0 {
+                if op2 < 0 {
+                    return Err(format!("Attempt to jump to {} at position {}", op2, counter).into());
+                }
+                *counter = op2 as usize;
+            }
+        } else if instr == 7 {
+            let op1 = read_parameter(&mut decoder, &memory, counter)?;
+            let op2 = read_parameter(&mut decoder, &memory, counter)?;
+            let target = get_parameter(&mut decoder, &memory, counter)?;
+            write(memory, target, if op1 < op2 { 1 } else { 0 })?;
+        } else if instr == 8 {
+            let op1 = read_parameter(&mut decoder, &memory, counter)?;
+            let op2 = read_parameter(&mut decoder, &memory, counter)?;
+            let target = get_parameter(&mut decoder, &memory, counter)?;
+            write(memory, target, if op1 == op2 { 1 } else { 0 })?;
         } else {
             return Err(format!("Unknown instruction {} at position {}", instr, counter).into());
         }
