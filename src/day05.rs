@@ -55,27 +55,31 @@ fn main() -> Res<()> {
     let file = BufReader::new(File::open("inputs/day05.txt")?);
 
     // Read the program
-    let mut program = read_program(file)?;
+    let program = read_program(file)?;
 
-    // Input: "1, ID of the air condition unit"
-    let input = || Ok(1);
+    // Part 1
+    {
+        let mut program = program.clone();
 
-    // Output: 0 ok, 1 indicates error in self-test
-    let mut last_output = 0;
-    let output = |i: i32| -> Res<()> {
-        if last_output != 0 {
-            Err(format!("Error from self-test (output {})", last_output).into())
-        } else {
-            last_output = i;
-            Ok(())
-        }
-    };
+        // Run it
+        let mut output = 0;
+        run_program(&mut program, || Ok(1), |i| { output = i; Ok(()) })?;
 
-    // Run it
-    run_program(&mut program, input, output)?;
+        // Print output
+        println!("Output for diagnostic 1: {}", output);
+    }
 
-    // Print output
-    println!("Output: {}", last_output);
+    // Part 2
+    {
+        let mut program = program.clone();
+
+        // Run it
+        let mut output = 0;
+        run_program(&mut program, || Ok(5), |i| { output = i; Ok(()) })?;
+
+        // Print output
+        println!("Output for diagnostic 5: {}", output);
+    }
 
     Ok(())
 }
