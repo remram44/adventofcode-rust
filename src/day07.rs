@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use adventofcode2019::{Res, read_program, run_program};
+use adventofcode2019::{Res, read_program, run_program, step_program};
 
 struct Permutations {
     size: usize,
@@ -103,38 +103,102 @@ fn main() -> Res<()> {
     // Read the program
     let program = read_program(file)?;
 
-    let mut best_phases = None;
+    // Part 1
+    {
+        let mut best_phases = None;
 
-    // Go through all possible phase settings
-    for phases in permutations(5, 5) {
-        // Run the programs with those phase settings
-        let mut output = 0;
-        for phase in &phases {
-            let mut program = program.clone();
-            // Elements are read in reverse: phase then current output
-            let mut inputs = vec![output, *phase as i32];
-            run_program(
-                &mut program,
-                || inputs.pop().ok_or("Read too many inputs".into()),
-                |i| { output = i; Ok(()) },
-            )?;
-        }
-
-        // Update best phases
-        match best_phases {
-            None => {
-                best_phases = Some((output, phases.clone()));
+        // Go through all possible phase settings
+        for phases in permutations(5, 5) {
+            // Run the programs with those phase settings
+            let mut output = 0;
+            for phase in &phases {
+                let mut program = program.clone();
+                // Elements are read in reverse: phase then current output
+                let mut inputs = vec![output, *phase as i32];
+                run_program(
+                    &mut program,
+                    || inputs.pop().ok_or("Read too many inputs".into()),
+                    |i| { output = i; Ok(()) },
+                )?;
             }
-            Some((best_output, _)) => {
-                if output > best_output {
+
+            // Update best phases
+            match best_phases {
+                None => {
                     best_phases = Some((output, phases.clone()));
+                }
+                Some((best_output, _)) => {
+                    if output > best_output {
+                        best_phases = Some((output, phases.clone()));
+                    }
                 }
             }
         }
+
+        let (best_output, best_phases) = best_phases.unwrap();
+        println!("Best output: {} for phases {:?}", best_output, best_phases);
     }
 
-    let (best_output, best_phases) = best_phases.unwrap();
-    println!("Best output: {} for phases {:?}", best_output, best_phases);
+    // Part 2
+    {
+        let mut best_phases = None;
+
+        // Go through all possible phase settings
+        for mut phases in permutations(5, 5) {
+            for phase in phases.iter_mut() {
+                *phase += 5; // 0-4 -> 5-9
+            }
+
+            // Instantiate 5 programs
+            let mut programs: Vec<_> = (0..5).map(|_| (program.clone(), 0)).collect();
+
+            // Loop until any finishes
+            let mut supplied_phase = false;
+            let mut output = 0;
+            let mut running = true;
+            while running {
+                for ((program, counter), phase) in programs.iter_mut().zip(&phases) {
+                    let mut inputs = if supplied_phase {
+                        vec![output]
+                    } else {
+                        vec![output, *phase as i32]
+                    };
+
+                    // Run program until it outputs something, or exits
+                    let mut got_output = false;
+                    while running && !got_output {
+                        running = step_program(
+                            program,
+                            counter,
+                            || inputs.pop().ok_or("Read too many inputs".into()),
+                            |i| {
+                                output = i;
+                                got_output = true;
+                                Ok(())
+                            },
+                        )?;
+                    }
+                }
+
+                supplied_phase = true;
+            }
+
+            // Update best phases
+            match best_phases {
+                None => {
+                    best_phases = Some((output, phases.clone()));
+                }
+                Some((best_output, _)) => {
+                    if output > best_output {
+                        best_phases = Some((output, phases.clone()));
+                    }
+                }
+            }
+        }
+
+        let (best_output, best_phases) = best_phases.unwrap();
+        println!("Best output: {} for phases {:?}", best_output, best_phases);
+    }
 
     Ok(())
 }
