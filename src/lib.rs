@@ -222,6 +222,9 @@ impl Program {
                 let op2 = self.read_parameter(&mut decoder)?;
                 let target = self.get_parameter(&mut decoder)?;
                 self.write(target, if op1 == op2 { 1 } else { 0 })?;
+            } else if instr == 9 {
+                let op = self.read_parameter(&mut decoder)?;
+                self.relative_base += op;
             } else {
                 return Err(format!("Unknown instruction {} at position {}", instr, self.counter).into());
             }
