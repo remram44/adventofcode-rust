@@ -2,7 +2,7 @@ use std::io::Read;
 
 pub type Res<O> = Result<O, Box<dyn std::error::Error>>;
 
-pub fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
+fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
     let mut memory = Vec::new();
 
     let mut position = 0;
@@ -40,37 +40,6 @@ pub fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
     }
 
     Ok(memory)
-}
-
-fn read(memory: &Vec<i32>, pos: Parameter) -> Res<i32> {
-    match pos {
-        Parameter::Position(addr) => {
-            if addr < 0 {
-                Err("Read negative offset".into())
-            } else if addr as usize >= memory.len() {
-                Err("Read exceeds memory size".into())
-            } else {
-                Ok(memory[addr as usize])
-            }
-        }
-        Parameter::Immediate(v) => Ok(v),
-    }
-}
-
-fn write(memory: &mut Vec<i32>, pos: Parameter, value: i32) -> Res<()> {
-    match pos {
-        Parameter::Position(addr) => {
-            if addr < 0 {
-                Err("Write negative offset".into())
-            } else if addr as usize >= memory.len() {
-                Err("Write exceeds memory size".into())
-            } else {
-                memory[addr as usize] = value;
-                Ok(())
-            }
-        }
-        Parameter::Immediate(_) => Err("Can't write on immediate value".into()),
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,108 +81,151 @@ fn test_decode() {
     assert_eq!(decoder.decode_parameter(423).unwrap(), Parameter::Position(423));
 }
 
-fn get_parameter(
-    decoder: &mut ParameterDecoder,
-    memory: &Vec<i32>,
-    pos: &mut usize,
-) -> Res<Parameter> {
-    let param = decoder.decode_parameter(memory[*pos])?;
-    *pos += 1;
-    Ok(param)
+#[derive(Clone)]
+pub struct Program {
+    pub memory: Vec<i32>,
+    pub counter: usize,
 }
 
-fn read_parameter(
-    decoder: &mut ParameterDecoder,
-    memory: &Vec<i32>,
-    pos: &mut usize,
-) -> Res<i32> {
-    let op = get_parameter(decoder, memory, pos)?;
-    read(memory, op)
-}
-
-pub fn step_program<I, O>(
-    memory: &mut Vec<i32>,
-    counter: &mut usize,
-    mut input: I,
-    mut output: O,
-) -> Res<bool>
-where
-    I: FnMut() -> Res<i32>,
-    O: FnMut(i32) -> Res<()>,
-{
-    if *counter >= memory.len() {
-        Ok(false)
-    } else {
-        let instr = read(memory, Parameter::Position(*counter as i32))?;
-        *counter += 1;
-        let (instr, mut decoder) = decode_instruction(instr)?;
-        if instr == 99 {
-            // Halt
-            return Ok(false);
-        } else if instr == 1 {
-            let op1 = read_parameter(&mut decoder, &memory, counter)?;
-            let op2 = read_parameter(&mut decoder, &memory, counter)?;
-            let target = get_parameter(&mut decoder, &memory, counter)?;
-            write(memory, target, op1 + op2)?;
-        } else if instr == 2 {
-            let op1 = read_parameter(&mut decoder, &memory, counter)?;
-            let op2 = read_parameter(&mut decoder, &memory, counter)?;
-            let target = get_parameter(&mut decoder, &memory, counter)?;
-            write(memory, target, op1 * op2)?;
-        } else if instr == 3 {
-            let target = get_parameter(&mut decoder, &memory, counter)?;
-            write(memory, target, input()?)?;
-        } else if instr == 4 {
-            let op = read_parameter(&mut decoder, &memory, counter)?;
-            output(op)?;
-        } else if instr == 5 {
-            let op1 = read_parameter(&mut decoder, &memory, counter)?;
-            let op2 = read_parameter(&mut decoder, &memory, counter)?;
-            if op1 != 0 {
-                if op2 < 0 {
-                    return Err(format!("Attempt to jump to {} at position {}", op2, counter).into());
-                }
-                *counter = op2 as usize;
-            }
-        } else if instr == 6 {
-            let op1 = read_parameter(&mut decoder, &memory, counter)?;
-            let op2 = read_parameter(&mut decoder, &memory, counter)?;
-            if op1 == 0 {
-                if op2 < 0 {
-                    return Err(format!("Attempt to jump to {} at position {}", op2, counter).into());
-                }
-                *counter = op2 as usize;
-            }
-        } else if instr == 7 {
-            let op1 = read_parameter(&mut decoder, &memory, counter)?;
-            let op2 = read_parameter(&mut decoder, &memory, counter)?;
-            let target = get_parameter(&mut decoder, &memory, counter)?;
-            write(memory, target, if op1 < op2 { 1 } else { 0 })?;
-        } else if instr == 8 {
-            let op1 = read_parameter(&mut decoder, &memory, counter)?;
-            let op2 = read_parameter(&mut decoder, &memory, counter)?;
-            let target = get_parameter(&mut decoder, &memory, counter)?;
-            write(memory, target, if op1 == op2 { 1 } else { 0 })?;
-        } else {
-            return Err(format!("Unknown instruction {} at position {}", instr, counter).into());
+impl Program {
+    pub fn new(memory: Vec<i32>) -> Program {
+        Program {
+            memory,
+            counter: 0,
         }
-        Ok(true)
     }
-}
 
-pub fn run_program<I, O>(
-    memory: &mut Vec<i32>,
-    mut input: I,
-    mut output: O,
-) -> Res<()>
-where
-    I: FnMut() -> Res<i32>,
-    O: FnMut(i32) -> Res<()>,
-{
-    let mut counter = 0;
-    loop {
-        if !step_program(memory, &mut counter, &mut input, &mut output)? {
-            return Ok(());
+    pub fn from_reader<R: Read>(file: R) -> Res<Program> {
+        let memory = read_program(file)?;
+        Ok(Program::new(memory))
+    }
+
+    fn read(&self, pos: Parameter) -> Res<i32> {
+        match pos {
+            Parameter::Position(addr) => {
+                if addr < 0 {
+                    Err("Read negative offset".into())
+                } else if addr as usize >= self.memory.len() {
+                    Err("Read exceeds memory size".into())
+                } else {
+                    Ok(self.memory[addr as usize])
+                }
+            }
+            Parameter::Immediate(v) => Ok(v),
+        }
+    }
+
+    fn write(&mut self, pos: Parameter, value: i32) -> Res<()> {
+        match pos {
+            Parameter::Position(addr) => {
+                if addr < 0 {
+                    Err("Write negative offset".into())
+                } else if addr as usize >= self.memory.len() {
+                    Err("Write exceeds memory size".into())
+                } else {
+                    self.memory[addr as usize] = value;
+                    Ok(())
+                }
+            }
+            Parameter::Immediate(_) => Err("Can't write on immediate value".into()),
+        }
+    }
+
+    fn get_parameter(
+        &mut self,
+        decoder: &mut ParameterDecoder,
+    ) -> Res<Parameter> {
+        let param = decoder.decode_parameter(self.memory[self.counter])?;
+        self.counter += 1;
+        Ok(param)
+    }
+
+    fn read_parameter(
+        &mut self,
+        decoder: &mut ParameterDecoder,
+    ) -> Res<i32> {
+        let op = self.get_parameter(decoder)?;
+        self.read(op)
+    }
+
+    pub fn step<I, O>(
+        &mut self,
+        mut input: I,
+        mut output: O,
+    ) -> Res<bool>
+    where
+        I: FnMut() -> Res<i32>,
+        O: FnMut(i32) -> Res<()>,
+    {
+        if self.counter >= self.memory.len() {
+            Ok(false)
+        } else {
+            let instr = self.read(Parameter::Position(self.counter as i32))?;
+            self.counter += 1;
+            let (instr, mut decoder) = decode_instruction(instr)?;
+            if instr == 99 {
+                // Halt
+                return Ok(false);
+            } else if instr == 1 {
+                let op1 = self.read_parameter(&mut decoder)?;
+                let op2 = self.read_parameter(&mut decoder)?;
+                let target = self.get_parameter(&mut decoder)?;
+                self.write(target, op1 + op2)?;
+            } else if instr == 2 {
+                let op1 = self.read_parameter(&mut decoder)?;
+                let op2 = self.read_parameter(&mut decoder)?;
+                let target = self.get_parameter(&mut decoder)?;
+                self.write(target, op1 * op2)?;
+            } else if instr == 3 {
+                let target = self.get_parameter(&mut decoder)?;
+                self.write(target, input()?)?;
+            } else if instr == 4 {
+                let op = self.read_parameter(&mut decoder)?;
+                output(op)?;
+            } else if instr == 5 {
+                let op1 = self.read_parameter(&mut decoder)?;
+                let op2 = self.read_parameter(&mut decoder)?;
+                if op1 != 0 {
+                    if op2 < 0 {
+                        return Err(format!("Attempt to jump to {} at position {}", op2, self.counter).into());
+                    }
+                    self.counter = op2 as usize;
+                }
+            } else if instr == 6 {
+                let op1 = self.read_parameter(&mut decoder)?;
+                let op2 = self.read_parameter(&mut decoder)?;
+                if op1 == 0 {
+                    if op2 < 0 {
+                        return Err(format!("Attempt to jump to {} at position {}", op2, self.counter).into());
+                    }
+                    self.counter = op2 as usize;
+                }
+            } else if instr == 7 {
+                let op1 = self.read_parameter(&mut decoder)?;
+                let op2 = self.read_parameter(&mut decoder)?;
+                let target = self.get_parameter(&mut decoder)?;
+                self.write(target, if op1 < op2 { 1 } else { 0 })?;
+            } else if instr == 8 {
+                let op1 = self.read_parameter(&mut decoder)?;
+                let op2 = self.read_parameter(&mut decoder)?;
+                let target = self.get_parameter(&mut decoder)?;
+                self.write(target, if op1 == op2 { 1 } else { 0 })?;
+            } else {
+                return Err(format!("Unknown instruction {} at position {}", instr, self.counter).into());
+            }
+            Ok(true)
+        }
+    }
+
+    pub fn run<I, O>(&mut self, mut input: I, mut output: O) -> Res<()>
+    where
+        I: FnMut() -> Res<i32>,
+        O: FnMut(i32) -> Res<()>,
+    {
+        loop {
+            if !self.step(&mut input, &mut output)? {
+                return Ok(());
+            }
         }
     }
 }

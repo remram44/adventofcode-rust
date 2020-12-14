@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use adventofcode2019::{Res, read_program, run_program, step_program};
+use adventofcode2019::{Res, Program};
 
 struct Permutations {
     size: usize,
@@ -101,7 +101,7 @@ fn main() -> Res<()> {
     let file = BufReader::new(File::open("inputs/day07.txt")?);
 
     // Read the program
-    let program = read_program(file)?;
+    let program = Program::from_reader(file)?;
 
     // Part 1
     {
@@ -115,8 +115,7 @@ fn main() -> Res<()> {
                 let mut program = program.clone();
                 // Elements are read in reverse: phase then current output
                 let mut inputs = vec![output, *phase as i32];
-                run_program(
-                    &mut program,
+                program.run(
                     || inputs.pop().ok_or("Read too many inputs".into()),
                     |i| { output = i; Ok(()) },
                 )?;
@@ -150,14 +149,14 @@ fn main() -> Res<()> {
             }
 
             // Instantiate 5 programs
-            let mut programs: Vec<_> = (0..5).map(|_| (program.clone(), 0)).collect();
+            let mut programs: Vec<_> = (0..5).map(|_| program.clone()).collect();
 
             // Loop until any finishes
             let mut supplied_phase = false;
             let mut output = 0;
             let mut running = true;
             while running {
-                for ((program, counter), phase) in programs.iter_mut().zip(&phases) {
+                for (program, phase) in programs.iter_mut().zip(&phases) {
                     let mut inputs = if supplied_phase {
                         vec![output]
                     } else {
@@ -167,9 +166,7 @@ fn main() -> Res<()> {
                     // Run program until it outputs something, or exits
                     let mut got_output = false;
                     while running && !got_output {
-                        running = step_program(
-                            program,
-                            counter,
+                        running = program.step(
                             || inputs.pop().ok_or("Read too many inputs".into()),
                             |i| {
                                 output = i;
