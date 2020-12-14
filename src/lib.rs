@@ -2,6 +2,8 @@ use std::io::Read;
 
 pub type Res<O> = Result<O, Box<dyn std::error::Error>>;
 
+const MAX_MEMORY: usize = 1 << 32;
+
 fn read_program<R: Read>(mut file: R) -> Res<Vec<i64>> {
     let mut memory = Vec::new();
 
@@ -110,7 +112,7 @@ impl Program {
                 if addr < 0 {
                     Err("Read negative offset".into())
                 } else if addr as usize >= self.memory.len() {
-                    Err("Read exceeds memory size".into())
+                    Ok(0)
                 } else {
                     Ok(self.memory[addr as usize])
                 }
@@ -128,10 +130,18 @@ impl Program {
             Parameter::Position(addr) => {
                 if addr < 0 {
                     Err("Write negative offset".into())
-                } else if addr as usize >= self.memory.len() {
-                    Err("Write exceeds memory size".into())
                 } else {
-                    self.memory[addr as usize] = value;
+                    let addr = addr as usize;
+                    if addr >= self.memory.len() {
+                        if addr < MAX_MEMORY {
+                            self.memory.resize(addr + 1, 0);
+                        } else {
+                            return Err(
+                                format!("Can't grow memory to {}", addr + 1).into(),
+                            );
+                        }
+                    }
+                    self.memory[addr] = value;
                     Ok(())
                 }
             }
