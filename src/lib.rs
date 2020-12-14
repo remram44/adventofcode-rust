@@ -46,6 +46,7 @@ fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
 enum Parameter {
     Position(i32),
     Immediate(i32),
+    Relative(i32),
 }
 
 struct ParameterDecoder(i32);
@@ -57,6 +58,7 @@ impl ParameterDecoder {
         match code {
             0 => Ok(Parameter::Position(value)),
             1 => Ok(Parameter::Immediate(value)),
+            2 => Ok(Parameter::Relative(value)),
             _ => Err(format!("Invalid parameter mode {}", code).into()),
         }
     }
@@ -85,6 +87,7 @@ fn test_decode() {
 pub struct Program {
     pub memory: Vec<i32>,
     pub counter: usize,
+    pub relative_base: i32,
 }
 
 impl Program {
@@ -92,6 +95,7 @@ impl Program {
         Program {
             memory,
             counter: 0,
+            relative_base: 0,
         }
     }
 
@@ -112,6 +116,10 @@ impl Program {
                 }
             }
             Parameter::Immediate(v) => Ok(v),
+            Parameter::Relative(rel_addr) => {
+                let addr = self.relative_base + rel_addr;
+                self.read(Parameter::Position(addr))
+            }
         }
     }
 
@@ -128,6 +136,10 @@ impl Program {
                 }
             }
             Parameter::Immediate(_) => Err("Can't write on immediate value".into()),
+            Parameter::Relative(rel_addr) => {
+                let addr = self.relative_base + rel_addr;
+                self.write(Parameter::Position(addr), value)
+            }
         }
     }
 
