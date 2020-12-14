@@ -2,12 +2,12 @@ use std::io::Read;
 
 pub type Res<O> = Result<O, Box<dyn std::error::Error>>;
 
-fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
+fn read_program<R: Read>(mut file: R) -> Res<Vec<i64>> {
     let mut memory = Vec::new();
 
     let mut position = 0;
     let mut negative = false;
-    let mut number: i32 = 0;
+    let mut number: i64 = 0;
     loop {
         let byte = {
             let mut buf = [0u8];
@@ -23,7 +23,7 @@ fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
             }
             negative = true;
         } else if b'0' <= byte && byte <= b'9' {
-            number = number * 10 + (byte - b'0') as i32;
+            number = number * 10 + (byte - b'0') as i64;
         } else if byte == b',' || byte == b'\n' {
             memory.push(if negative { -number } else { number });
             number = 0;
@@ -44,15 +44,15 @@ fn read_program<R: Read>(mut file: R) -> Res<Vec<i32>> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Parameter {
-    Position(i32),
-    Immediate(i32),
-    Relative(i32),
+    Position(i64),
+    Immediate(i64),
+    Relative(i64),
 }
 
-struct ParameterDecoder(i32);
+struct ParameterDecoder(i64);
 
 impl ParameterDecoder {
-    fn decode_parameter(&mut self, value: i32) -> Res<Parameter> {
+    fn decode_parameter(&mut self, value: i64) -> Res<Parameter> {
         let code = self.0 % 10;
         self.0 /= 10;
         match code {
@@ -64,7 +64,7 @@ impl ParameterDecoder {
     }
 }
 
-fn decode_instruction(code: i32) -> Res<(i32, ParameterDecoder)> {
+fn decode_instruction(code: i64) -> Res<(i64, ParameterDecoder)> {
     if code <= 0 {
         Err(format!("Invalid opcode {}", code).into())
     } else {
@@ -85,13 +85,13 @@ fn test_decode() {
 
 #[derive(Clone)]
 pub struct Program {
-    pub memory: Vec<i32>,
+    pub memory: Vec<i64>,
     pub counter: usize,
-    pub relative_base: i32,
+    pub relative_base: i64,
 }
 
 impl Program {
-    pub fn new(memory: Vec<i32>) -> Program {
+    pub fn new(memory: Vec<i64>) -> Program {
         Program {
             memory,
             counter: 0,
@@ -104,7 +104,7 @@ impl Program {
         Ok(Program::new(memory))
     }
 
-    fn read(&self, pos: Parameter) -> Res<i32> {
+    fn read(&self, pos: Parameter) -> Res<i64> {
         match pos {
             Parameter::Position(addr) => {
                 if addr < 0 {
@@ -123,7 +123,7 @@ impl Program {
         }
     }
 
-    fn write(&mut self, pos: Parameter, value: i32) -> Res<()> {
+    fn write(&mut self, pos: Parameter, value: i64) -> Res<()> {
         match pos {
             Parameter::Position(addr) => {
                 if addr < 0 {
@@ -155,7 +155,7 @@ impl Program {
     fn read_parameter(
         &mut self,
         decoder: &mut ParameterDecoder,
-    ) -> Res<i32> {
+    ) -> Res<i64> {
         let op = self.get_parameter(decoder)?;
         self.read(op)
     }
@@ -166,13 +166,13 @@ impl Program {
         mut output: O,
     ) -> Res<bool>
     where
-        I: FnMut() -> Res<i32>,
-        O: FnMut(i32) -> Res<()>,
+        I: FnMut() -> Res<i64>,
+        O: FnMut(i64) -> Res<()>,
     {
         if self.counter >= self.memory.len() {
             Ok(false)
         } else {
-            let instr = self.read(Parameter::Position(self.counter as i32))?;
+            let instr = self.read(Parameter::Position(self.counter as i64))?;
             self.counter += 1;
             let (instr, mut decoder) = decode_instruction(instr)?;
             if instr == 99 {
@@ -234,8 +234,8 @@ impl Program {
 
     pub fn run<I, O>(&mut self, mut input: I, mut output: O) -> Res<()>
     where
-        I: FnMut() -> Res<i32>,
-        O: FnMut(i32) -> Res<()>,
+        I: FnMut() -> Res<i64>,
+        O: FnMut(i64) -> Res<()>,
     {
         loop {
             if !self.step(&mut input, &mut output)? {
@@ -245,10 +245,10 @@ impl Program {
     }
 }
 
-pub fn no_input() -> Res<i32> {
+pub fn no_input() -> Res<i64> {
     Err("No input available".into())
 }
 
-pub fn no_output(_: i32) -> Res<()> {
+pub fn no_output(_: i64) -> Res<()> {
     Err("No output possible".into())
 }

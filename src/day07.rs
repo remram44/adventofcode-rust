@@ -114,7 +114,7 @@ fn main() -> Res<()> {
             for phase in &phases {
                 let mut program = program.clone();
                 // Elements are read in reverse: phase then current output
-                let mut inputs = vec![output, *phase as i32];
+                let mut inputs = vec![output, *phase as i64];
                 program.run(
                     || inputs.pop().ok_or("Read too many inputs".into()),
                     |i| { output = i; Ok(()) },
@@ -160,7 +160,7 @@ fn main() -> Res<()> {
                     let mut inputs = if supplied_phase {
                         vec![output]
                     } else {
-                        vec![output, *phase as i32]
+                        vec![output, *phase as i64]
                     };
 
                     // Run program until it outputs something, or exits
